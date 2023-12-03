@@ -309,31 +309,27 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   values.forEach((value) => {
     const type = value.type.replace(/-/g, "_");
     const tags = [`pageUrl=${url}`, `origin=${origin}`, `id=${id}`];
-
+  
     if (value.type === "peer-connection") {
       tags.push(`state=${state}`);
     }
-
+  
     Object.entries(value).forEach(([key, v]) => {
-      // Handle number and object types as before
+      // Handle special characters in tag values
+      if (typeof v === "string") {
+        v = v.replace(/,| |;|=/g, '_'); // Example of handling special characters
+      }
+  
+      // Constructing InfluxDB line protocol
       if (typeof v === "number") {
         const fieldSet = `${key}=${v}`;
         influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
-      } else if (typeof v === "object") {
-        Object.entries(v).forEach(([subkey, subv]) => {
-          if (typeof subv === "number") {
-            const fieldSet = `${key}_${subkey}=${subv}`;
-            influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
-          }
-        });
-      } else if (key === "qualityLimitationReason" && QualityLimitationReasons[v] !== undefined) {
-        const fieldSet = `${key}=${QualityLimitationReasons[v]}`;
-        influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
-      } else if (key !== "googTimingFrameInfo") {
+      } else {
         tags.push(`${key}=${v}`);
       }
     });
   });
+
 
   if (influxData.length > 0) {
     return sendDataInflux("POST", { id, origin }, influxData + "\n");
