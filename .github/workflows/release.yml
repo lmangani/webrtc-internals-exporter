@@ -2,7 +2,7 @@ name: Build Extension
 
 on:
   release:
-    types: [published, edited, created]
+    types: [edited, created]
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
          mkdir -p build
     - run: |
         npm_package_version=$(jq -r '.version' app/package.json)
-        jq ".version = \"${npm_package_version}\"" manifest.json > ${OUTDIR}/manifest.json
+        jq ".version = \"${npm_package_version}\"" manifest.json > build/manifest.json
         cp -r images app/background.js app/content-script.js app/override.js README.md build
         cp app/node_modules/pako/dist/pako.min.js build/assets
     - name: Archive Release
