@@ -1,0 +1,31 @@
+name: Build Extension
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+    - run: |
+         cd app && npm install && npm run build
+         mkdir -p build
+    - run: |
+        npm_package_version=$(jq -r '.version' app/package.json)
+        jq ".version = \"${npm_package_version}\"" manifest.json > ${OUTDIR}/manifest.json
+        cp -r images app/background.js app/content-script.js app/override.js README.md build
+        cp app/node_modules/pako/dist/pako.min.js build/assets
+    - name: Archive Release
+      uses: thedoctor0/zip-release@0.7.5
+      with:
+        type: 'zip'
+        directory: 'build'
+        filename: 'latest.zip'
