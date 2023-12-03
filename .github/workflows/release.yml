@@ -24,7 +24,7 @@ jobs:
       uses: thedoctor0/zip-release@0.7.5
       with:
         type: 'zip'
-        directory: 'build'
+        path: 'build'
         filename: 'latest.zip'
     - name: Upload release
       uses: boxpositron/upload-multiple-releases@1.0.7
