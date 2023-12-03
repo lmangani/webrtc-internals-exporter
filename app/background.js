@@ -241,6 +241,50 @@ const QualityLimitationReasons = {
  * @param {RTCPeerConnectionState} state
  * @param {any} values
  */
+
+async function sendPeerConnectionStatsLineProto(url, id, state, values) {
+  const origin = new URL(url).origin;
+
+  if (state === "closed") {
+    return sendData("DELETE", { id, origin });
+  }
+
+  let influxData = "";
+  values.forEach((value) => {
+    const type = value.type.replace(/-/g, "_");
+    const tags = [`pageUrl=${url}`, `origin=${origin}`, `id=${id}`];
+
+    if (value.type === "peer-connection") {
+      tags.push(`state=${state}`);
+    }
+
+    Object.entries(value).forEach(([key, v]) => {
+      // Handle number and object types as before
+      if (typeof v === "number") {
+        const fieldSet = `${key}=${v}`;
+        influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
+      } else if (typeof v === "object") {
+        Object.entries(v).forEach(([subkey, subv]) => {
+          if (typeof subv === "number") {
+            const fieldSet = `${key}_${subkey}=${subv}`;
+            influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
+          }
+        });
+      } else if (key === "qualityLimitationReason" && QualityLimitationReasons[v] !== undefined) {
+        const fieldSet = `${key}=${QualityLimitationReasons[v]}`;
+        influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
+      } else if (key !== "googTimingFrameInfo") {
+        tags.push(`${key}=${v}`);
+      }
+    });
+  });
+
+  if (influxData.length > 0) {
+    return sendData("POST", { id, origin }, influxData + "\n");
+  }
+}
+
+
 async function sendPeerConnectionStats(url, id, state, values) {
   const origin = new URL(url).origin;
 
@@ -302,7 +346,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.event === "peer-connection-stats") {
     const { url, id, state, values } = message.data;
 
-    sendPeerConnectionStats(url, id, state, values)
+    sendPeerConnectionStatsLineProto(url, id, state, values)
       .then(() => {
         sendResponse({});
       })
