@@ -172,6 +172,62 @@ async function cleanupPeerConnections() {
   );
 }
 
+// Send data to InfluxDB with line protocol.
+async function sendDataInflux(method, { id, origin }, data) {
+  const { url, username, password, gzip, job } = options;
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (username && password) {
+    headers.Authorization = "Basic " + btoa(`${username}:${password}`);
+  }
+  if (data && gzip) {
+    headers["Content-Encoding"] = "gzip";
+    data = await pako.gzip(data);
+  }
+  /* console.log(
+    `[webrtc-internals-exporter] sendData: ${data.length} bytes (gzip: ${gzip}) url: ${url} job: ${job}`,
+  ); */
+  const start = Date.now();
+  const response = await fetch(
+    `${url}/influx/api/v2/write`,
+    {
+      method,
+      headers,
+      body: method === "POST" ? data : undefined,
+    },
+  );
+
+  const stats = await chrome.storage.local.get([
+    "messagesSent",
+    "bytesSent",
+    "totalTime",
+    "errors",
+  ]);
+  if (data) {
+    stats.messagesSent = (stats.messagesSent || 0) + 1;
+    stats.bytesSent = (stats.bytesSent || 0) + data.length;
+    stats.totalTime = (stats.totalTime || 0) + Date.now() - start;
+  }
+  if (!response.ok) {
+    stats.errors = (stats.errors || 0) + 1;
+  }
+  await chrome.storage.local.set(stats);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Response status: ${response.status} error: ${text}`);
+  }
+
+  await setPeerConnectionLastUpdate(
+    { id, origin },
+    method === "POST" ? start : undefined,
+  );
+
+  return response.text();
+}
+
+
 // Send data to pushgateway.
 async function sendData(method, { id, origin }, data) {
   const { url, username, password, gzip, job } = options;
@@ -246,7 +302,7 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   const origin = new URL(url).origin;
 
   if (state === "closed") {
-    return sendData("DELETE", { id, origin });
+    // return sendData("DELETE", { id, origin });
   }
 
   let influxData = "";
@@ -280,7 +336,7 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   });
 
   if (influxData.length > 0) {
-    return sendData("POST", { id, origin }, influxData + "\n");
+    return sendDataInflux("POST", { id, origin }, influxData + "\n");
   }
 }
 
