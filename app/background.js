@@ -308,7 +308,7 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   let influxData = "";
   values.forEach((value) => {
     const type = value.type.replace(/-/g, "_");
-    const tags = [`pageUrl=${url}`, `origin=${origin}`, `id=${id}`];
+    const tags = [`pageUrl=${url}`, `origin=${origin}`, `uniqueId=${id}`]; // Changed to 'uniqueId' to avoid conflicts
   
     if (value.type === "peer-connection") {
       tags.push(`state=${state}`);
@@ -317,19 +317,19 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
     Object.entries(value).forEach(([key, v]) => {
       // Handle special characters in tag values
       if (typeof v === "string") {
-        v = v.replace(/,| |;|=/g, '_'); // Example of handling special characters
+        v = v.replace(/,| |;|=/g, '_'); // Handling special characters
       }
   
       // Constructing InfluxDB line protocol
       if (typeof v === "number") {
         const fieldSet = `${key}=${v}`;
-        influxData += `${type},${tags.join(",")} ${fieldSet}\n`;
+        const timestamp = /* logic to get the timestamp, if applicable */ 
+        influxData += `${type},${tags.join(",")} ${fieldSet}${timestamp ? ` ${timestamp}` : ''}\n`;
       } else {
         tags.push(`${key}=${v}`);
       }
     });
   });
-
 
   if (influxData.length > 0) {
     return sendDataInflux("POST", { id, origin }, influxData + "\n");
