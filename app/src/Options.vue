@@ -4,6 +4,7 @@
 import { reactive, computed } from "vue";
 import { useVuelidate } from "@vuelidate/core";
 import { helpers } from "@vuelidate/validators";
+import getBrowserFingerprint from 'get-browser-fingerprint';
 
 const state = reactive({
   version: import.meta.env.PACKAGE_VERSION || "dev",
@@ -16,6 +17,7 @@ const state = reactive({
   url: "",
   username: "",
   password: "",
+  uuid: getBrowserFingerprint() || false,
   updateInterval: 2,
   gzip: false,
   job: "webrtc-internals-exporter",
@@ -158,7 +160,7 @@ function removeOrigin(item) {
                 <v-text-field
                   color="primary"
                   v-model="state.url"
-                  label="Pushgateway URL"
+                  label="Endpoint URL"
                   clearable
                   required
                 ></v-text-field>
@@ -209,6 +211,15 @@ function removeOrigin(item) {
                   color="primary"
                   v-model="state.job"
                   label="Pushgateway job name"
+                  clearable
+                ></v-text-field>
+              </v-col>
+
+               <v-col cols="12" md="12">
+                <v-text-field
+                  color="primary"
+                  v-model="state.uuid"
+                  label="UUID"
                   clearable
                 ></v-text-field>
               </v-col>
