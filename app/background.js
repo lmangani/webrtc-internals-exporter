@@ -300,41 +300,45 @@ const QualityLimitationReasons = {
 
 async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   const origin = new URL(url).origin;
+  const { job } = options;
 
   if (state === "closed") {
-    // return sendData("DELETE", { id, origin });
+    return sendData("DELETE", { id, origin });
   }
 
   let influxData = "";
   values.forEach((value) => {
-    const type = value.type.replace(/-/g, "_");
-    const tags = [`pageUrl=${url}`, `origin=${origin}`, `uniqueId=${id}`]; // Changed to 'uniqueId' to avoid conflicts
-  
+    const baseMeasurement = value.type.replace(/-/g, "_");
+    const tags = [`pageUrl=${url}`, `origin=${origin}`, `peerConnectionId=${id}`, `exported_job=${job}`];
+
     if (value.type === "peer-connection") {
       tags.push(`state=${state}`);
     }
-  
-    Object.entries(value).forEach(([key, v]) => {
-      // Handle special characters in tag values
-      if (typeof v === "string") {
-        v = v.replace(/,| |;|=/g, '_'); // Handling special characters
+
+    for (let [key, v] of Object.entries(value)) {
+      if (key === "type" || typeof v === "object") {
+        continue; // Skip 'type' and object types
       }
-  
-      // Constructing InfluxDB line protocol
-      if (typeof v === "number") {
-        const fieldSet = `${key}=${v}`;
-        const timestamp = /* logic to get the timestamp, if applicable */ 
-        influxData += `${type},${tags.join(",")} ${fieldSet}${timestamp ? ` ${timestamp}` : ''}\n`;
-      } else {
-        tags.push(`${key}=${v}`);
+
+      // Convert non-numeric values to tags
+      if (typeof v !== "number") {
+        tags.push(`${key}=${String(v).replace(/,| |;|=/g, '_')}`);
+        continue;
       }
-    });
+
+      // Create the full measurement name for numeric values
+      const measurement = `${baseMeasurement}_${key}`;
+      const fieldSet = `${key}=${v}`;
+      influxData += `${measurement},${tags.join(",")} ${fieldSet}\n`;
+    }
   });
 
   if (influxData.length > 0) {
-    return sendDataInflux("POST", { id, origin }, influxData + "\n");
+    return sendDataInflux("POST", { id, origin }, influxData);
   }
 }
+
+
 
 
 async function sendPeerConnectionStats(url, id, state, values) {
@@ -397,7 +401,7 @@ async function sendPeerConnectionStats(url, id, state, values) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.event === "peer-connection-stats") {
     const { url, id, state, values } = message.data;
-
+    console.log('got stats', message.data);
     sendPeerConnectionStatsLineProto(url, id, state, values)
       .then(() => {
         sendResponse({});
