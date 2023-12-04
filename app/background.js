@@ -300,6 +300,7 @@ const QualityLimitationReasons = {
 
 async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   const origin = new URL(url).origin;
+  const pageUrl = url.split('?')[0];
   const { job } = options;
 
   if (state === "closed") {
@@ -309,7 +310,7 @@ async function sendPeerConnectionStatsLineProto(url, id, state, values) {
   let influxData = "";
   values.forEach((value) => {
     const baseMeasurement = value.type.replace(/-/g, "_");
-    const tags = [`pageUrl=${url}`, `origin=${origin}`, `peerConnectionId=${id}`, `exported_job=${job}`];
+    const tags = [`pageUrl=${pageUrl}`, `origin=${origin}`, `peerConnectionId=${id}`, `exported_job=${job}`];
 
     if (value.type === "peer-connection") {
       tags.push(`state=${state}`);
